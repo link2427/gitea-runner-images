@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG BASE_IMAGE=runner-base:local
-FROM mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim AS dotnet
+FROM mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim AS dotnet
 
 FROM ${BASE_IMAGE}
 
