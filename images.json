@@ -1,0 +1,32 @@
+[
+  {
+    "name": "runner-base",
+    "dockerfile": "images/base/Dockerfile",
+    "depends_on": null,
+    "toolchains": ["Node.js 22", "common CI utilities"]
+  },
+  {
+    "name": "runner-python311",
+    "dockerfile": "images/python311/Dockerfile",
+    "depends_on": "runner-base",
+    "toolchains": ["Python 3.11", "pip", "venv"]
+  },
+  {
+    "name": "runner-cpp",
+    "dockerfile": "images/cpp/Dockerfile",
+    "depends_on": "runner-base",
+    "toolchains": ["GCC 12", "CMake 3", "Ninja 1"]
+  },
+  {
+    "name": "runner-dotnet8",
+    "dockerfile": "images/dotnet8/Dockerfile",
+    "depends_on": "runner-base",
+    "toolchains": [".NET SDK 8"]
+  },
+  {
+    "name": "runner-node22",
+    "dockerfile": "images/node22/Dockerfile",
+    "depends_on": "runner-base",
+    "toolchains": ["Node.js 22", "npm 10", "Corepack"]
+  }
+]

@@ -1,0 +1,9 @@
+name: .NET
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: dotnet-8
+    steps:
+      - uses: actions/checkout@v4
+      - run: dotnet restore
+      - run: dotnet test --no-restore
