@@ -47,15 +47,22 @@ RUN apt-get update \
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 
-# Register the bundled Node.js in the hosted tool cache so that
-# actions/setup-node with node-version 22 resolves locally instead of
-# downloading.
+# Register toolchains in the hosted tool cache so that actions/setup-node and
+# actions/setup-python resolve them locally instead of downloading.
+# The runner mounts ONE shared volume (act-toolcache) over this directory in
+# every job container, seeded from whichever image runs first. So every
+# image must carry the same entries: they are all defined here, as symlinks
+# to fixed paths. /opt/python only exists in runner-python311; elsewhere the
+# Python entry dangles and setup-python reports the version as missing.
 ENV RUNNER_TOOL_CACHE=/opt/hostedtoolcache \
     AGENT_TOOLSDIRECTORY=/opt/hostedtoolcache
 RUN node_version="$(node -p 'process.versions.node')" \
-    && mkdir -p "$RUNNER_TOOL_CACHE/node/$node_version" \
+    && python_version="$(python3 -c 'import platform; print(platform.python_version())')" \
+    && mkdir -p "$RUNNER_TOOL_CACHE/node/$node_version" "$RUNNER_TOOL_CACHE/Python/$python_version" \
     && ln -s /usr/local "$RUNNER_TOOL_CACHE/node/$node_version/x64" \
     && touch "$RUNNER_TOOL_CACHE/node/$node_version/x64.complete" \
+    && ln -s /opt/python "$RUNNER_TOOL_CACHE/Python/$python_version/x64" \
+    && touch "$RUNNER_TOOL_CACHE/Python/$python_version/x64.complete" \
     && chown -R runner:runner "$RUNNER_TOOL_CACHE"
 
 # Node.js and Python's requests ship their own CA lists; point them at the

@@ -130,6 +130,13 @@ fi
 
 if ((start)); then
   say "Starting the runner"
+  # The runner shares one tool-cache volume between all jobs, seeded once from
+  # the first job image that mounts it. Reset it so this bundle's toolchains
+  # are what setup-node and setup-python find.
+  if docker volume inspect act-toolcache >/dev/null 2>&1 \
+      && ! docker volume rm act-toolcache >/dev/null 2>&1; then
+    warn "Could not reset the act-toolcache volume (a job is using it). Run 'docker volume rm act-toolcache' when the runner is idle."
+  fi
   (cd "$dir" && docker compose up --detach --remove-orphans)
   for _ in $(seq 1 30); do
     [[ -s "$dir/data/.runner" ]] && break

@@ -168,6 +168,12 @@ if (-not $SkipActions) {
 
 if (-not $NoStart) {
     Say 'Starting the runner'
+    # The runner shares one tool-cache volume between all jobs, seeded once from
+    # the first job image that mounts it. Reset it so this bundle's toolchains
+    # are what setup-node and setup-python find.
+    if ((Test-Docker volume inspect act-toolcache) -and -not (Test-Docker volume rm act-toolcache)) {
+        Write-Warning "Could not reset the act-toolcache volume (a job is using it). Run 'docker volume rm act-toolcache' when the runner is idle."
+    }
     Push-Location -LiteralPath $Dir
     try { Assert-Docker 'Starting the runner' compose up --detach --remove-orphans } finally { Pop-Location }
     for ($i = 0; $i -lt 30; $i++) {

@@ -29,6 +29,7 @@ case "$name" in
       node --version | grep -Eq "^v22\."
       test -f "$RUNNER_TOOL_CACHE/node/$(node -p process.versions.node)/x64.complete"
       test -x "$RUNNER_TOOL_CACHE/node/$(node -p process.versions.node)/x64/bin/node"
+      test -f "$RUNNER_TOOL_CACHE/Python/$(python3 -c "import platform; print(platform.python_version())")/x64.complete"
       zstd --version
     '
     ;;

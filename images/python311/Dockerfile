@@ -14,17 +14,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Debian marks the system interpreter as externally managed, so a plain
-# `pip install` fails. Jobs instead get a runner-owned environment on PATH,
-# registered in the hosted tool cache so actions/setup-python with
-# python-version 3.11 resolves locally instead of downloading.
-RUN python_version="$(python3 -c 'import platform; print(platform.python_version())')" \
-    && python3 -m venv /opt/python \
+# `pip install` fails. Jobs instead get a runner-owned environment on PATH.
+# runner-base already registered /opt/python in the hosted tool cache, so
+# actions/setup-python with python-version 3.11 resolves to it.
+RUN python3 -m venv /opt/python \
     && /opt/python/bin/python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && /opt/python/bin/python -m pip install --no-cache-dir build pytest pytest-cov virtualenv \
-    && mkdir -p "$RUNNER_TOOL_CACHE/Python/$python_version" \
-    && ln -s /opt/python "$RUNNER_TOOL_CACHE/Python/$python_version/x64" \
-    && touch "$RUNNER_TOOL_CACHE/Python/$python_version/x64.complete" \
-    && chown -R runner:runner /opt/python "$RUNNER_TOOL_CACHE"
+    && chown -R runner:runner /opt/python
 
 ENV PATH=/opt/python/bin:$PATH \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
