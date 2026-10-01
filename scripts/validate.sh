@@ -31,10 +31,10 @@ if command -v shellcheck >/dev/null 2>&1; then
   shellcheck --severity=warning --external-sources --source-path="$repo_root" "$repo_root"/scripts/*.sh "$repo_root"/offline/*.sh
 fi
 if command -v pwsh >/dev/null 2>&1; then
-  pwsh -NoProfile -Command '
+  PS1_FILE="$repo_root/offline/install.ps1" pwsh -NoProfile -NonInteractive -Command '
     $errors = $null
-    [System.Management.Automation.Language.Parser]::ParseFile($args[0], [ref]$null, [ref]$errors) | Out-Null
-    if ($errors) { $errors; exit 1 }' "$repo_root/offline/install.ps1"
+    [System.Management.Automation.Language.Parser]::ParseFile($env:PS1_FILE, [ref]$null, [ref]$errors) | Out-Null
+    if ($errors) { $errors | ForEach-Object { Write-Error $_.ToString() }; exit 1 }'
 fi
 
 if grep -rnIiE 'sasmn|koda|10\.[0-9]+\.[0-9]+\.[0-9]+|olympus|internal registry' "$repo_root" \
