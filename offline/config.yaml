@@ -1,0 +1,41 @@
+# Created once by the installer and never overwritten, so edit freely.
+# Upgrades that change the recommended settings write config.yaml.template
+# next to this file for comparison.
+log:
+  level: info
+
+runner:
+  file: .runner
+  # Number of jobs that may run at the same time.
+  capacity: 1
+  # Extra environment for every job, e.g. PIP_INDEX_URL or NPM_CONFIG_REGISTRY
+  # pointing at a package registry inside the air gap. Edit job.env, not this.
+  env_file: /job.env
+  timeout: 3h
+  # `uses: actions/checkout@v4` normally means github.com. This sends those
+  # clones to the action repositories the installer pushed into Gitea.
+  github_mirror: "@GITEA_INSTANCE_URL@"
+  # Ignored: compose.yaml passes the bundle's labels on every start, so each
+  # new bundle's images take effect. Add your own with EXTRA_RUNNER_LABELS in .env.
+  labels: []
+
+cache:
+  # The built-in cache server is unreachable from job containers unless the
+  # runner and jobs share a network; see the README before enabling.
+  enabled: false
+
+container:
+  network: ""
+  privileged: false
+  # The installer keeps this volume filled with the public CAs plus any site
+  # certificates from ca-certificates/, so jobs trust an internal Gitea.
+  options: "-v gitea-runner-ca:/etc/ssl/certs:ro"
+  valid_volumes:
+    - gitea-runner-ca
+  # "-" keeps the Docker socket out of job containers. Set it to "" to let
+  # jobs use the bundled docker CLI against the host daemon (trusted
+  # workflows only: that grants root on the host).
+  docker_host: "-"
+  # Never contact a registry: every image is loaded from the bundle.
+  force_pull: false
+  force_rebuild: false

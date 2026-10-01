@@ -16,3 +16,15 @@ image_field() {
 all_images() {
   jq -r '.[].name' "$repo_root/images.json"
 }
+
+# Comma-separated act_runner labels mapping every workflow label to a local image.
+runner_labels() {
+  local version="$1"
+  jq -r --arg version "$version" \
+    '[.[] | .name as $name | .labels[] | "\(.):docker://\($name):\($version)"] | join(",")' \
+    "$repo_root/images.json"
+}
+
+bundle_field() {
+  jq -r "$1" "$repo_root/bundle.json"
+}

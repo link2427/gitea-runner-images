@@ -3,30 +3,35 @@
     "name": "runner-base",
     "dockerfile": "images/base/Dockerfile",
     "depends_on": null,
-    "toolchains": ["Node.js 22", "common CI utilities"]
+    "labels": ["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "linux"],
+    "toolchains": ["Node.js 22 (actions runtime)", "Python 3.11 (system)", "Docker CLI, Buildx and Compose", "common CI utilities"]
   },
   {
     "name": "runner-python311",
     "dockerfile": "images/python311/Dockerfile",
     "depends_on": "runner-base",
-    "toolchains": ["Python 3.11", "pip", "venv"]
+    "labels": ["python-3.11"],
+    "toolchains": ["Python 3.11 (pip-writable, setup-python compatible)", "pytest", "build", "wheel"]
   },
   {
     "name": "runner-cpp",
     "dockerfile": "images/cpp/Dockerfile",
     "depends_on": "runner-base",
-    "toolchains": ["GCC 12", "CMake 3", "Ninja 1"]
+    "labels": ["cpp"],
+    "toolchains": ["GCC 12", "Clang 14", "CMake 3", "Ninja 1", "Meson", "Autotools", "ccache", "GDB", "Valgrind"]
   },
   {
     "name": "runner-dotnet8",
     "dockerfile": "images/dotnet8/Dockerfile",
     "depends_on": "runner-base",
+    "labels": ["dotnet-8"],
     "toolchains": [".NET SDK 8"]
   },
   {
     "name": "runner-node22",
     "dockerfile": "images/node22/Dockerfile",
     "depends_on": "runner-base",
-    "toolchains": ["Node.js 22", "npm 10", "Corepack"]
+    "labels": ["node-22"],
+    "toolchains": ["Node.js 22", "npm 10", "pnpm and Yarn (pre-fetched for offline Corepack)"]
   }
 ]

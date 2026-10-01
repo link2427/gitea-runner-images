@@ -1,90 +1,96 @@
-# Gitea runner images
+# Gitea runner images for air-gapped hosts
 
-Reusable Docker job images for Gitea Actions and `act_runner`. Release assets are
-ordinary Docker archives, so they can be downloaded in a browser, moved to an
-offline machine and imported without access to a container registry.
+Builds one file, `gitea-offline-X.Y.Z.tar`, holding everything a Docker host
+with no internet access needs to run Gitea Actions jobs: the job images, the
+`gitea-runner` controller, mirrors of the common `actions/*` repositories, and
+an installer that also handles upgrades.
+
+The design goal is that you burn it once and don't come back for something
+that was missing:
+
+- **One file per release.** Images, actions, installer, docs and checksums
+  are in a single archive. Every image goes into one `docker save`, so layers
+  shared through `runner-base` are stored once.
+- **Actions work offline.** `uses: actions/checkout@v4` (and `cache`,
+  `upload-artifact`, `download-artifact`, `setup-python`, `setup-node`,
+  `github-script`) are pushed into your Gitea with every tag, and the runner
+  is configured to fetch them there.
+- **No download at job time.** `setup-node`/`setup-python` find the bundled
+  Node.js 22 and Python 3.11 in the tool cache, Corepack has pnpm and Yarn
+  cached, and `pip install` works without a venv.
+- **Fixes without a reburn.** Package registry mirrors (`job.env`), internal
+  CA certificates (`ca-certificates/`), extra labels, Docker access for jobs
+  and network attachment are all settings on the target host.
+- **Painless upgrades.** Run the new bundle's installer. It keeps your
+  settings and registration, updates the labels, and can prune old images.
+- **Tested air-gapped before release.** CI installs every bundle against a
+  throwaway Gitea with container internet access firewalled off, then runs
+  [`tests/airgap`](tests/airgap/.github/workflows/airgap.yml) on every label.
+  A bundle that needs the internet fails the release.
+
+Installation, upgrades and configuration on the target host are covered in
+[`offline/README.md`](offline/README.md), which also ships inside the bundle.
 
 ## Images
 
-| Image | Contents |
-| --- | --- |
-| `runner-base` | Debian 12, Node.js 22 action runtime, Git, Git LFS, SSH, curl, jq, archive tools and passwordless sudo |
-| `runner-python311` | Base plus Python 3.11, pip, development headers and venv |
-| `runner-cpp` | Base plus GCC/G++ 12, CMake 3, Ninja 1, GDB and pkg-config |
-| `runner-dotnet8` | Base plus the .NET 8 SDK |
-| `runner-node22` | Base plus Node.js 22, npm 10 and Corepack |
+| `runs-on:` | Image | Contents |
+| --- | --- | --- |
+| `ubuntu-latest`, `ubuntu-24.04`, `ubuntu-22.04`, `linux` | `runner-base` | Debian 12, Node.js 22, Python 3, git, Git LFS, Docker CLI with Buildx and Compose, jq, curl, wget, rsync, make, zip/xz/zstd, passwordless sudo |
+| `python-3.11` | `runner-python311` | Base plus Python 3.11 with headers, a runner-owned environment on `PATH`, pytest, build |
+| `cpp` | `runner-cpp` | Base plus GCC 12, Clang/LLD 14, CMake, Ninja, Meson, Autotools, ccache, GDB, Valgrind |
+| `dotnet-8` | `runner-dotnet8` | Base plus the .NET 8 SDK |
+| `node-22` | `runner-node22` | Base plus npm, pnpm and Yarn (classic and stable) |
 
-Specialized images inherit `runner-base`, and all images run job steps as the
-unprivileged `runner` user. Major toolchain versions remain stable within a
-repository major release; patch versions follow the upstream Debian, Node and
-.NET image updates.
+All images are linux/amd64 and run steps as the unprivileged `runner` user.
+Toolchain major versions are fixed per image. Dependabot proposes only minor
+and patch updates; a new major version gets a new image and label.
 
-## Versioning and releases
+## Releasing
 
-Tags use semantic versions such as `v1.0.0`. A version tag builds and smoke-tests
-all images, creates both `.tar` and `.tar.zst` exports, writes `manifest.json` and
-`SHA256SUMS`, creates an optional compressed all-images bundle, and attaches the
-files directly to the matching GitHub Release.
+Push a `vX.Y.Z` tag. The [release workflow](.github/workflows/release.yml)
+builds and smoke-tests every image (smoke tests run with `--network none`),
+packages the bundle, runs the air-gap test, and attaches these to the GitHub
+Release:
 
-Download the files from the repository's **Releases** page. Verify them before
-moving or importing them:
+- `gitea-offline-X.Y.Z.tar`: the file to burn.
+- `SHA256SUMS`: checksum of the above.
+- `manifest.json`: image IDs, digests, labels and action commits.
 
-```sh
-sha256sum --check SHA256SUMS
-docker load --input runner-python311-1.0.0.tar
-```
+To rebuild an existing tag, run the workflow manually with that tag.
 
-For a compressed archive:
+## Customizing the bundle
 
-```sh
-zstd --decompress --stdout runner-python311-1.0.0.tar.zst | docker load
-```
+- **Job images:** add a Dockerfile under `images/` that starts
+  `FROM ${BASE_IMAGE}`, add an entry with its labels to
+  [`images.json`](images.json), and add a smoke test to
+  [`scripts/smoke-image.sh`](scripts/smoke-image.sh).
+- **Actions, controller and service images:** edit
+  [`bundle.json`](bundle.json). `actions` lists GitHub repositories to mirror,
+  and `extra_images` lists additional images to include, such as
+  `postgres:16` for service containers.
 
-The loaded image is tagged `runner-python311:1.0.0`. The all-images bundle
-contains every compressed image archive, a manifest and its own checksums.
+## Building locally
 
-## Build locally
-
-Docker, Bash, Git, jq, ripgrep, Python 3 with PyYAML, and zstd are required.
+You need Docker with Buildx, Bash, git, jq, Python 3 with PyYAML, gzip and
+OpenSSL.
 
 ```sh
 ./scripts/validate.sh
-./scripts/build-image.sh runner-python311 local
-./scripts/smoke-image.sh runner-python311 local
+./scripts/build-image.sh runner-python311 local   # builds runner-base first if needed
+./scripts/release.sh 1.2.3                        # every image, then dist/gitea-offline-1.2.3.tar
+./scripts/test-bundle.sh dist/gitea-offline-1.2.3.tar
+AIRGAP=1 ./scripts/test-bundle.sh dist/gitea-offline-1.2.3.tar   # with egress blocked; needs sudo and iptables
 ```
 
-Build the complete release payload locally with:
-
-```sh
-./scripts/release.sh 1.0.0
-```
-
-## Gitea `act_runner` labels
-
-Import the desired images on the Docker host used by `act_runner`, then register
-labels that map workflow names to those local Docker images:
-
-```sh
-./act_runner register --no-interactive \
-  --instance https://gitea.example.com \
-  --token YOUR_REGISTRATION_TOKEN \
-  --labels "ubuntu-latest:docker://runner-base:1.0.0,python-3.11:docker://runner-python311:1.0.0,cpp:docker://runner-cpp:1.0.0,dotnet-8:docker://runner-dotnet8:1.0.0,node-22:docker://runner-node22:1.0.0"
-```
-
-Use the corresponding label in a workflow, for example `runs-on: python-3.11`.
-Small complete examples are available in [`examples/`](examples/):
-
-- [Python](examples/python.yml)
-- [C++](examples/cpp.yml)
-- [.NET](examples/dotnet.yml)
-- [Node.js](examples/node.yml)
+`test-bundle.sh` uses host port 3000 and the Compose project name
+`gitea-runner`, so don't run it on a machine that already runs the offline
+runner.
 
 ## CI safety
 
-Pull requests and releases use GitHub-hosted runners. Public repositories should
-not expose self-hosted runners to pull-request code; a contributor can change a
-workflow's runner label in the proposed commit. Use a separate trusted private
-dispatcher if release builds must run on private infrastructure.
+Pull requests and releases run on GitHub-hosted runners. Don't expose
+self-hosted runners to pull-request code from a public repository: a
+contributor can change a workflow's runner label in their proposed commit.
 
 ## License
 
