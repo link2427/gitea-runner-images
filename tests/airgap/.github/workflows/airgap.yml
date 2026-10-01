@@ -1,0 +1,78 @@
+# Runs inside the test Gitea with all container egress blocked. Every step
+# must succeed using only what the offline bundle provides.
+name: airgap
+on: [push]
+jobs:
+  base:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/github-script@v7
+        with:
+          script: console.log('github-script ran')
+      - name: No route to the internet
+        run: |
+          if timeout 15 curl -sS https://github.com >/dev/null 2>&1; then
+            echo "github.com is reachable: this test is not air-gapped" >&2
+            exit 1
+          fi
+      - run: |
+          test -f marker.txt
+          node --version | grep '^v22\.'
+          python3 --version
+          docker --version
+          docker buildx version
+          docker compose version
+          git lfs version
+          test "$SITE_SETTING" = from-job-env
+          openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt "$GITHUB_WORKSPACE/test-ca.crt"
+
+  python:
+    runs-on: python-3.11
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python --version | grep 'Python 3\.11\.'
+          pip install --no-index --no-build-isolation ./pyproj
+          python -c 'import airgap_demo; assert airgap_demo.answer() == 42'
+          pytest -q pyproj
+
+  cpp:
+    runs-on: cpp
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cmake -S cppproj -B build -G Ninja
+          cmake --build build
+          test "$(./build/demo)" = 42
+          CXX=clang++ cmake -S cppproj -B build-clang -G Ninja
+          cmake --build build-clang
+          test "$(./build-clang/demo)" = 42
+
+  dotnet:
+    runs-on: dotnet-8
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          dotnet new console --output app >/dev/null
+          dotnet build app
+          test "$(dotnet run --project app --no-build)" = "Hello, World!"
+
+  node:
+    runs-on: node-22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          node --version | grep '^v22\.'
+          pnpm --version
+          yarn --version
+          npm --prefix nodeproj test

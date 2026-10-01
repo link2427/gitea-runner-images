@@ -1,6 +1,2 @@
-.git
-.github
-dist
-examples
-README.md
-LICENSE
+# The Dockerfiles copy nothing from the build context.
+*

@@ -1,0 +1,13 @@
+{
+  "controller": "docker.io/gitea/runner:2",
+  "extra_images": [],
+  "actions": [
+    "actions/checkout",
+    "actions/cache",
+    "actions/upload-artifact",
+    "actions/download-artifact",
+    "actions/setup-python",
+    "actions/setup-node",
+    "actions/github-script"
+  ]
+}

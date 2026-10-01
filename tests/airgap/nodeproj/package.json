@@ -1,0 +1,5 @@
+{
+  "name": "airgap-demo",
+  "private": true,
+  "scripts": { "test": "node -e \"process.exit(6 * 7 === 42 ? 0 : 1)\"" }
+}

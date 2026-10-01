@@ -1,13 +1,14 @@
 version: 2
 updates:
+  # Toolchain majors are part of each image's contract (node-22, dotnet-8, ...),
+  # so only minor and patch updates are proposed. New majors get new images.
   - package-ecosystem: docker
-    directory: /images/base
+    directories: [/images/base, /images/dotnet8]
     schedule:
       interval: weekly
-  - package-ecosystem: docker
-    directory: /images/dotnet8
-    schedule:
-      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:

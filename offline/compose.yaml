@@ -1,0 +1,26 @@
+# Managed by the installer and replaced on every upgrade. Site settings belong
+# in .env, config.yaml and job.env, which upgrades never touch.
+name: gitea-runner
+services:
+  runner:
+    image: "@CONTROLLER@"
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      CONFIG_FILE: /config.yaml
+      GITEA_INSTANCE_URL: ${GITEA_INSTANCE_URL:?Set GITEA_INSTANCE_URL in .env}
+      GITEA_RUNNER_REGISTRATION_TOKEN: ${GITEA_RUNNER_REGISTRATION_TOKEN:-}
+      GITEA_RUNNER_NAME: ${GITEA_RUNNER_NAME:-offline-runner}
+      # Applied on every start, so a new bundle's images are picked up without
+      # re-registering. Add site-specific labels with EXTRA_RUNNER_LABELS in .env.
+      GITEA_RUNNER_LABELS: "@LABELS@${EXTRA_RUNNER_LABELS:+,}${EXTRA_RUNNER_LABELS:-}"
+    volumes:
+      - ./config.yaml:/config.yaml:ro
+      - ./job.env:/job.env:ro
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ca-certificates:/etc/ssl/certs:ro
+volumes:
+  ca-certificates:
+    name: gitea-runner-ca
+    external: true
