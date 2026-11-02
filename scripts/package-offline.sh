@@ -19,19 +19,24 @@ mkdir -p "$stage/images" "$stage/actions"
 
 mapfile -t job_images < <(all_images | sed "s/\$/:$version/")
 controller="$(bundle_field '.controller')"
-# bundle.json pins the controller as TAG@sha256:... The digest-verified pull is
-# what guarantees the image CI tested; the plain TAG is what docker save,
-# inspect and the compose file use, because it is unambiguous after that pull.
-controller_image="${controller%%@*}"
-controller_digest="${controller#*@}"
+# bundle.json pins the controller as TAG@sha256:... Pulling the tag and then
+# checking the digest we actually got is what enforces the pin: if upstream
+# moves the tag, the check fails instead of quietly shipping a different runner.
+# The plain TAG is what docker save, inspect and the compose file use.
+controller_image="${controller%@*}"
+controller_digest="${controller##*@}"
 mapfile -t extra_images < <(bundle_field '.extra_images[]')
 
 # PULL_IMAGES=0 reuses local copies, e.g. when re-packaging after a registry outage.
 if [[ "${PULL_IMAGES:-1}" != 0 ]]; then
-  docker pull --quiet --platform "$platform" "$controller" >/dev/null
+  docker pull --quiet --platform "$platform" "$controller_image" >/dev/null
   if ! docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$controller_image" \
       | grep -q "@${controller_digest}\$"; then
-    echo "$controller_image is not $controller_digest after pulling it" >&2
+    {
+      echo "$controller_image is not pinned digest $controller_digest after pulling it."
+      echo "Upstream moved the tag. Pick a version you have verified and update"
+      echo "bundle.json to \"$controller_image@<its digest>\"."
+    } >&2
     exit 1
   fi
   for image in "${extra_images[@]}"; do
