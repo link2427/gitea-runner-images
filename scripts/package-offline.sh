@@ -19,11 +19,27 @@ mkdir -p "$stage/images" "$stage/actions"
 
 mapfile -t job_images < <(all_images | sed "s/\$/:$version/")
 controller="$(bundle_field '.controller')"
+# bundle.json pins the controller as TAG@sha256:... Pulling the tag and then
+# checking the digest we actually got is what enforces the pin: if upstream
+# moves the tag, the check fails instead of quietly shipping a different runner.
+# The plain TAG is what docker save, inspect and the compose file use.
+controller_image="${controller%@*}"
+controller_digest="${controller##*@}"
 mapfile -t extra_images < <(bundle_field '.extra_images[]')
 
 # PULL_IMAGES=0 reuses local copies, e.g. when re-packaging after a registry outage.
 if [[ "${PULL_IMAGES:-1}" != 0 ]]; then
-  for image in "$controller" "${extra_images[@]}"; do
+  docker pull --quiet --platform "$platform" "$controller_image" >/dev/null
+  if ! docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$controller_image" \
+      | grep -q "@${controller_digest}\$"; then
+    {
+      echo "$controller_image is not pinned digest $controller_digest after pulling it."
+      echo "Upstream moved the tag. Pick a version you have verified and update"
+      echo "bundle.json to \"$controller_image@<its digest>\"."
+    } >&2
+    exit 1
+  fi
+  for image in "${extra_images[@]}"; do
     docker pull --quiet --platform "$platform" "$image" >/dev/null
   done
 fi
@@ -31,7 +47,7 @@ fi
 # One archive for everything: docker save stores each shared layer once, so
 # the base image is not repeated for every toolchain image. gzip is the one
 # compression every docker and podman version can load directly.
-all_tags=("${job_images[@]}" "$controller" "${extra_images[@]}")
+all_tags=("${job_images[@]}" "$controller_image" "${extra_images[@]}")
 echo "Exporting ${#all_tags[@]} images"
 compressor=(gzip -6)
 if command -v pigz >/dev/null 2>&1; then compressor=(pigz -6); fi
@@ -51,7 +67,11 @@ sed -e "s|@LABELS@|$(runner_labels "$version")|" \
     "$repo_root/offline/compose.yaml" > "$stage/compose.yaml"
 cp -r "$repo_root/examples" "$stage/examples"
 
-python3 - "$repo_root" "$stage" "$version" "$revision" "$controller" "${extra_images[@]}" <<'PY'
+# Plain-text image names, so the installers can prune old versions without jq
+# (target hosts are not required to have it).
+jq -r '.[].name' "$repo_root/images.json" > "$stage/images.txt"
+
+python3 - "$repo_root" "$stage" "$version" "$revision" "$controller_image" "${extra_images[@]}" <<'PY'
 import json
 import pathlib
 import subprocess

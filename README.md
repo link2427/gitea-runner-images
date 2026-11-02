@@ -67,7 +67,17 @@ To rebuild an existing tag, run the workflow manually with that tag.
 - **Actions, controller and service images:** edit
   [`bundle.json`](bundle.json). `actions` lists GitHub repositories to mirror,
   and `extra_images` lists additional images to include, such as
-  `postgres:16` for service containers.
+  `postgres:16` for service containers. `controller` pins the `gitea/runner`
+  image by tag *and* digest, so a rebuild weeks later cannot silently swap
+  the runner that CI tested. Bump both together, taking the digest from the tag
+  you verified:
+
+  ```sh
+  docker buildx imagetools inspect docker.io/gitea/runner:2.3.0
+  ```
+
+  `manifest.json` in the bundle records the resolved digest as well, so an
+  installed host can be checked against it.
 
 ## Building locally
 

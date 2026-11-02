@@ -1,5 +1,5 @@
 {
-  "controller": "docker.io/gitea/runner:2",
+  "controller": "docker.io/gitea/runner:2.3.0@sha256:66d80966792e621c9761c47919644198d35fd1c297e9a01e69ed3c1ae37db0c7",
   "extra_images": [],
   "actions": [
     "actions/checkout",

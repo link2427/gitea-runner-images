@@ -16,9 +16,12 @@ jq -e '
 
 jq -e '
   (.controller | type == "string" and length > 0)
+  # A floating tag would let a rebuild bake in a runner that CI never tested.
+  and (.controller | test("@sha256:[0-9a-f]{64}$"))
   and (.extra_images | type == "array")
   and all(.actions[]; test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))
-' "$repo_root/bundle.json" >/dev/null || { echo 'bundle.json is invalid.' >&2; exit 1; }
+' "$repo_root/bundle.json" >/dev/null \
+  || { echo 'bundle.json is invalid: controller must be pinned as TAG@sha256:...' >&2; exit 1; }
 
 while IFS= read -r file; do
   test -f "$repo_root/$file" || { echo "Missing $file" >&2; exit 1; }

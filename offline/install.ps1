@@ -189,10 +189,21 @@ if (-not $NoStart) {
 
 if ($Prune) {
     Say 'Removing job images from other bundle versions'
-    $old = @(& docker image ls --format '{{.Repository}}:{{.Tag}}' |
-        Where-Object { $_ -match '^runner-[a-z0-9]+:' -and -not $_.EndsWith(":$Version") })
-    foreach ($image in $old) {
-        if ((Invoke-Docker image rm $image) -ne 0) { Write-Warning "Kept $image (still in use)." }
+    # Only this bundle's own images, and only their release tags: anything else
+    # on the host (a locally built runner-*, a :local tag) is left alone.
+    $imagesFile = Join-Path $Bundle 'images.txt'
+    if (-not (Test-Path -LiteralPath $imagesFile)) {
+        Write-Warning "$imagesFile is missing from this bundle; nothing pruned."
+    } else {
+        $listing = @(& docker image ls --format '{{.Repository}}:{{.Tag}}')
+        foreach ($name in (Get-Content -LiteralPath $imagesFile)) {
+            if (-not $name) { continue }
+            $pattern = '^' + [regex]::Escape($name) + ':[0-9]+\.[0-9]+\.[0-9]+$'
+            $old = @($listing | Where-Object { $_ -match $pattern -and $_ -ne "${name}:$Version" })
+            foreach ($image in $old) {
+                if ((Invoke-Docker image rm $image) -ne 0) { Write-Warning "Kept $image (still in use)." }
+            }
+        }
     }
 }
 
