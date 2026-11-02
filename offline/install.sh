@@ -76,6 +76,9 @@ fi
 
 url="$(env_get GITEA_INSTANCE_URL)"
 url="${url%/}"
+# .env holds the registration and access tokens; keep it private on upgrades
+# too, not just when the installer first creates it.
+chmod 600 "$dir/.env" 2>/dev/null || true
 if [[ -z "$url" || "$url" == *gitea.example.internal* ]]; then
   die "Set GITEA_INSTANCE_URL (and GITEA_RUNNER_REGISTRATION_TOKEN for the first install) in $dir/.env, then run this again."
 fi
@@ -151,9 +154,19 @@ fi
 
 if ((prune)); then
   say "Removing job images from other bundle versions"
-  docker image ls --format '{{.Repository}}:{{.Tag}}' \
-    | grep -E '^runner-[a-z0-9]+:' | grep -v ":$version\$" \
-    | xargs -r docker image rm || warn "Some old images are still in use and were kept."
+  # Only this bundle's own images, and only their release tags: anything else
+  # on the host (a locally built runner-*, a :local tag) is left alone.
+  if [[ ! -f "$bundle/images.txt" ]]; then
+    warn "$bundle/images.txt is missing from this bundle; nothing pruned."
+  else
+    while IFS= read -r name; do
+      [[ -n "$name" ]] || continue
+      docker image ls --format '{{.Repository}}:{{.Tag}}' \
+        | grep -E "^${name}:[0-9]+\.[0-9]+\.[0-9]+$" \
+        | grep -vxF "$name:$version" \
+        | xargs -r docker image rm || warn "Some old $name images are still in use and were kept."
+    done < "$bundle/images.txt"
+  fi
 fi
 
 printf '%s\n' "$version" > "$dir/VERSION"

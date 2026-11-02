@@ -9,6 +9,7 @@ access. Nothing here is downloaded at install or job time.
 | `actions/` | Git mirrors of common actions (`actions/checkout`, `setup-node`, ...) |
 | `install.sh`, `install.ps1` | Installer and upgrader for Linux and Windows hosts |
 | `manifest.json` | Image IDs, digests, labels and action commits in this bundle |
+| `images.txt` | Names of the job images this bundle ships, used by `--prune` |
 | `SHA256SUMS` | Checksums the installer verifies before touching anything |
 | `examples/` | Small workflows for each toolchain |
 
